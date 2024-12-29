@@ -201,7 +201,7 @@ def client(server_address: tuple[str, int]):
             params = parse_request_file(file_path)
             # Extract parameters from the parsed dictionary
             message = (
-                f"message:\"{params['message']}\"\n"
+                f"message:\"{params['message']} REQUEST_MAX_SIZE\"\n"
                 f"maximum_msg_size: {params['maximum_msg_size']}\n"
                 f"window_size: {params['window_size']}\n"
                 f"timeout: {params['timeout']}\n"
@@ -274,6 +274,8 @@ def client(server_address: tuple[str, int]):
             client_instance.run(message, max_size)
 
     finally:
+        if client_socket.timeout == 0:
+            print("Connection timed out.")
         client_socket.close()
         print("Connection closed.")
 
