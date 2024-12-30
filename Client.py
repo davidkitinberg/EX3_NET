@@ -72,6 +72,7 @@ class Client:
         self.next_seq_num = 0  # Sequence number for the next message to send
         self.base = 0  # Sequence number of the oldest unacknowledged message
         self.timer = None  # Timer for handling retransmission on timeout
+        self.reset_parameters()
 
     # This function starts the timer
     def start_timer(self):
@@ -79,6 +80,15 @@ class Client:
             self.timer.cancel()
         self.timer = Timer(self.timeout, self.handle_timeout)
         self.timer.start()
+
+    def reset_parameters(self):
+        """
+        Reset the client parameters for a new message transmission.
+        """
+        self.unacked_messages = {}  # Tracks unacknowledged messages by sequence number
+        self.next_seq_num = 0  # Sequence number for the next message to send
+        self.base = 0  # Sequence number of the oldest unacknowledged message
+        self.timer = None  # Timer for handling retransmission on timeout
 
     # This function stops the timer
     def stop_timer(self):
@@ -112,6 +122,8 @@ class Client:
 
     # This function manages the sliding window logic and sends chunks
     def run(self, message: str, max_size: int, max_retries: int = 5):
+        self.reset_parameters()
+
         # Divide message into chunks
         chunks = [
             f"M{i}:{message[i * max_size:(i + 1) * max_size]}"
@@ -138,29 +150,34 @@ class Client:
                 try:
                     # Wait for acknowledgments
                     ack = self.client_socket.recv(1024).decode('utf-8')
-                    acks = ack.split("ACK")
+                    acks = ack.split("ACK")  # Split by "ACK"
                     for ack in acks:
                         if ack.strip():  # Ignore empty parts
-                            ack_num = int(ack.strip())
-                            print(f"Received ACK for M{ack_num}")
+                            try:
+                                ack_num = int(ack.strip())  # Parse the acknowledgment number
+                                print(f"Received ACK for M{ack_num}")
 
-                            # Check if ACK advances the contiguous window
-                            if ack_num >= self.base:
-                                while self.base <= ack_num:
-                                    if self.base in self.unacked_messages:
-                                        del self.unacked_messages[self.base]
-                                    self.base += 1
-                                if self.base == self.next_seq_num:
-                                    self.stop_timer()  # Stop timer if all chunks are acknowledged
+                                if ack_num >= self.base:
+                                    # Mark received ACKs and check for contiguous acknowledgment
+                                    while self.base in self.unacked_messages:
+                                        if ack_num == self.base:  # If the base is acknowledged
+                                            del self.unacked_messages[self.base]
+                                            self.base += 1
+                                        else:
+                                            break  # Stop if there’s a gap in acknowledgment
+
+                                    if self.base == self.next_seq_num:
+                                        self.stop_timer()  # Stop timer if all chunks are acknowledged
+                                    else:
+                                        self.start_timer()  # Restart timer for the next unacknowledged chunk
+
+                                    retry_count = 0  # Reset retry count on successful acknowledgment
                                 else:
-                                    self.start_timer()  # Restart timer for the next unacknowledged chunk
-                                retry_count = 0  # Reset retry count on successful acknowledgment
-                            else:
-                                # Retransmit unacknowledged packets from the base
-                                print(f"Out-of-order ACK received. Retransmitting from sequence number {self.base}.")
-                                self.retransmit_unacked_messages()
+                                    print(f"Ignoring duplicate ACK for M{ack_num}.")
+                            except ValueError:
+                                print(f"Error parsing ACK: {ack.strip()}")  # Handle invalid ACK format
                 except socket.timeout:
-                    print(f"Timeout expired. Retransmitting from sequence number {self.base}.")
+                    #print(f"Timeout expired. Retransmitting from sequence number {self.base}.")
                     retry_count += 1
                     if retry_count > max_retries:
                         print(f"Maximum retries reached. Aborting transmission.")
@@ -261,7 +278,7 @@ def client(server_address: tuple[str, int]):
                     print("Error: File not found. Please try again.")
                     continue
                 except Exception as e:
-                    print(f"Error reading file: {e}. Please try again.")
+                    print(f"Error: reading file: {e}. Please try again.")
                     continue
             elif choice == '3':  # Close the connection
                 print("Closing connection to the server.")
