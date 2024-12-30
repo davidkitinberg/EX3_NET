@@ -72,7 +72,7 @@ class Client:
         self.next_seq_num = 0  # Sequence number for the next message to send
         self.base = 0  # Sequence number of the oldest unacknowledged message
         self.timer = None  # Timer for handling retransmission on timeout
-        self.reset_parameters()
+        self.reset_parameters() # Reset the parameters above for a new message
 
     # This function starts the timer
     def start_timer(self):
@@ -81,10 +81,11 @@ class Client:
         self.timer = Timer(self.timeout, self.handle_timeout)
         self.timer.start()
 
+    """
+    Reset the client parameters for a new message transmission.
+    """
     def reset_parameters(self):
-        """
-        Reset the client parameters for a new message transmission.
-        """
+
         self.unacked_messages = {}  # Tracks unacknowledged messages by sequence number
         self.next_seq_num = 0  # Sequence number for the next message to send
         self.base = 0  # Sequence number of the oldest unacknowledged message
@@ -111,7 +112,7 @@ class Client:
 
     # This function sends a message to the server
     def send_message(self, message: str):
-        if self.client_socket:
+        if self.client_socket: # Check if client's socket active
             try:
                 self.client_socket.sendall(message.encode('utf-8'))
             except OSError as e:
@@ -120,7 +121,14 @@ class Client:
         else:
             print("Socket is closed. Cannot send message.")
 
-    # This function manages the sliding window logic and sends chunks
+
+    """
+    This function manages the sliding window logic and sends chunks in the correct order.
+    Function's responsibility:
+    1. Divide message into chunks (given max_size).
+    2. Sending chunks in order while handing the sliding window.
+    3. Retransmit unacked messages if timeout expires / we got ACK out of order.
+    """
     def run(self, message: str, max_size: int, max_retries: int = 5):
         self.reset_parameters()
 
@@ -129,22 +137,22 @@ class Client:
             f"M{i}:{message[i * max_size:(i + 1) * max_size]}"
             for i in range((len(message) + max_size - 1) // max_size)
         ]
-        total_chunks = len(chunks)
+        total_chunks = len(chunks) # number of chunks
         print(f"Total chunks to send: {total_chunks}")
 
-        retry_count = 0  # Counter for retries on unacknowledged chunks
+        retry_count = 0  # Counter for retries on unacknowledged chunks.
 
         try:
-            # Send chunks with sliding window
+            # Send chunks with sliding window.
             while self.base < total_chunks:
-                # Send chunks within the current window
+                # Send chunks within the current window.
                 while self.next_seq_num < self.base + self.window_size and self.next_seq_num < total_chunks:
-                    chunk = chunks[self.next_seq_num]
-                    self.unacked_messages[self.next_seq_num] = chunk
+                    chunk = chunks[self.next_seq_num] # Current chunk.
+                    self.unacked_messages[self.next_seq_num] = chunk # Adding chunk to the unacked msg list.
                     print(f"Sending: {chunk}")
-                    self.send_message(chunk)
+                    self.send_message(chunk) # Send current chunk.
                     if self.base == self.next_seq_num:
-                        self.start_timer()  # Start timer for the oldest unacknowledged chunk
+                        self.start_timer()  # Start timer for the oldest unacknowledged chunk.
                     self.next_seq_num += 1
 
                 try:
@@ -176,8 +184,7 @@ class Client:
                                     print(f"Ignoring duplicate ACK for M{ack_num}.")
                             except ValueError:
                                 print(f"Error parsing ACK: {ack.strip()}")  # Handle invalid ACK format
-                except socket.timeout:
-                    #print(f"Timeout expired. Retransmitting from sequence number {self.base}.")
+                except socket.timeout: # Timeout expired. handling timeout exception
                     retry_count += 1
                     if retry_count > max_retries:
                         print(f"Maximum retries reached. Aborting transmission.")
@@ -198,11 +205,11 @@ def client(server_address: tuple[str, int]):
                          "2. File Input\n").strip()
 
     if input_choice == '1':
-        # Prompt user to enter timeout in seconds
+        # Prompt user to enter timeout in seconds.
         timeout = float(input("Enter timeout (seconds): ").strip())
-        # Prompt user to enter window size
+        # Prompt user to enter window size.
         window_size = int(input("Enter window size: ").strip())
-        # Construct the message manually
+        # Construct the message manually.
         message = (
             "message:\"REQUEST_MAX_SIZE\"\n"
             f"maximum_msg_size:0\n"
@@ -210,8 +217,8 @@ def client(server_address: tuple[str, int]):
             f"timeout: {timeout}\n"
         )
     elif input_choice == '2':
-        file_path = select_file()  # Open file explorer to select a file
-        if not file_path:
+        file_path = select_file()  # Open file explorer to select a file.
+        if not file_path: # User did not select a file to transmit.
             print("No file selected. Returning to main menu.")
             return
         try:
