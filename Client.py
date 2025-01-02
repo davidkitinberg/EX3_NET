@@ -211,7 +211,7 @@ def client(server_address: tuple[str, int]):
         window_size = int(input("Enter window size: ").strip())
         # Construct the message manually.
         message = (
-            "message:\"REQUEST_MAX_SIZE\"\n"
+            "message:\"REQUEST_MAX_SIZE_MANUAL\"\n"
             f"maximum_msg_size:0\n"
             f"window_size: {window_size}\n"
             f"timeout: {timeout}\n"
@@ -225,7 +225,7 @@ def client(server_address: tuple[str, int]):
             params = parse_request_file(file_path)
             # Extract parameters from the parsed dictionary
             message = (
-                f"message:\"{params['message']} REQUEST_MAX_SIZE\"\n"
+                f"message:\"{params['message']} REQUEST_MAX_SIZE_FILE\"\n"
                 f"maximum_msg_size: {params['maximum_msg_size']}\n"
                 f"window_size: {params['window_size']}\n"
                 f"timeout: {params['timeout']}\n"

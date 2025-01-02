@@ -1,12 +1,11 @@
 import socket
 import time
 import threading
-from Client import DEFAULT_SERVER_PORT, DEFAULT_SERVER_HOST
+from Client import DEFAULT_SERVER_PORT, DEFAULT_SERVER_HOST, select_file, parse_request_file
 
 # Constants for server
 HOST = DEFAULT_SERVER_HOST  # Localhost
 PORT = DEFAULT_SERVER_PORT
-MAX_SIZE = 1024
 import socket
 from threading import Thread
 
@@ -50,10 +49,26 @@ class Server:
             print(f"Received request from {client_address}:\n{request}")
 
             # Check for REQUEST_MAX_SIZE and respond
-            if "REQUEST_MAX_SIZE" in request:
+            if "REQUEST_MAX_SIZE_MANUAL" in request:
+                self.max_size= int(input("Enter Maximum Message Size : ").strip())
                 client_socket.sendall(str(self.max_size).encode('utf-8'))
-                print(f"Sent max size {self.max_size} to {client_address}")
 
+            # Check for REQUEST_MAX_SIZE and respond
+            if "REQUEST_MAX_SIZE_FILE" in request:
+                print("please choose a file to load the Maximum Message Size")
+                file_path = select_file()  # Open file explorer to select a file.
+                if not file_path:  # User did not select a file to transmit.
+                    print("No file selected. Returning to main menu.")
+                    return
+                try:
+                    params = parse_request_file(file_path)
+
+                    self.max_size = params['maximum_msg_size']
+                    client_socket.sendall(str(self.max_size).encode('utf-8'))
+                    print(f"Max Message Size loaded and parsed successfully from File")
+                except Exception as e:
+                    print(f"Error: {e}")
+                    return
             # Receive message chunks
             received_chunks = {}
             while True:
@@ -95,7 +110,7 @@ if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(description="A Sliding Window Server.")
     arg_parser.add_argument("-p", "--port", type=int, default=DEFAULT_SERVER_PORT, help="Port to listen on.")
     arg_parser.add_argument("-H", "--host", type=str, default=DEFAULT_SERVER_HOST, help="Host to bind to.")
-    arg_parser.add_argument("-s", "--max-size", type=int, default=20, help="Maximum chunk size.")
+    arg_parser.add_argument("-s", "--max-size", type=int, default=Server.max_size, help="Maximum chunk size.")
 
     args = arg_parser.parse_args()
 
